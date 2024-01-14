@@ -1,10 +1,15 @@
 package services
 
 import (
+	"banking/logs"
 	"banking/repository"
 	"database/sql"
 	"errors"
-	"log"
+)
+
+var (
+	ErrCustomerNotFound = errors.New("customer not found")
+	ErrUnexpectedError  = errors.New("unexpected error")
 )
 
 type customerService struct {
@@ -18,8 +23,8 @@ func NewCustomerService(custRepo repository.CustomerRepository) CustomerService 
 func (srv customerService) GetCustomers() ([]CustomerResponse, error) {
 	customers, err := srv.custRepo.GetAll()
 	if err != nil {
-		log.Println(err)
-		return nil, err
+		logs.Error(err)
+		return nil, ErrUnexpectedError
 	}
 	response := []CustomerResponse{}
 	for _, cust := range customers {
@@ -37,9 +42,11 @@ func (srv customerService) GetCustomer(id int) (*CustomerResponse, error) {
 	customer, err := srv.custRepo.GetByID(id)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, errors.New("customer not found")
+			logs.Error(err)
+			return nil, ErrCustomerNotFound
 		}
-		return nil, err
+		logs.Error(err)
+		return nil, ErrUnexpectedError
 	}
 	return &CustomerResponse{
 		CustomerID: customer.CustomerID,
