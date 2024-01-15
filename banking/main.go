@@ -6,10 +6,9 @@ import (
 	"banking/repository"
 	"banking/services"
 	"fmt"
-	"net/http"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/gofiber/fiber/v2"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/spf13/viper"
@@ -21,21 +20,24 @@ func main() {
 	// customerRepositoryMock := repository.NewCustomerRepositoryMock()
 	customerRepository := repository.NewCustomerRepositoryDB(db)
 	customerService := services.NewCustomerService(customerRepository)
-	customerHandler := handler.NewCustomerHandler(customerService)
+	customerHandler := handler.NewCustomerHandlerFiber(customerService)
 
 	accountRepository := repository.NewAccountRepositoryDB(db)
 	accountService := services.NewAccountService(accountRepository)
-	accountHandler := handler.NewAccountHandler(accountService)
+	accountHandlerFiber := handler.NewAccountHandlerFiber(accountService)
 
-	router := mux.NewRouter()
-	router.HandleFunc("/customers", customerHandler.GetCustomers)
-	router.HandleFunc("/customers/{customerID:[0-9]+}", customerHandler.GetCustomer)
+	// router := mux.NewRouter()
+	app := fiber.New()
 
-	router.HandleFunc("/accounts/{customerID:[0-9]+}/accounts", accountHandler.GetAccounts).Methods(http.MethodGet)
-	router.HandleFunc("/accounts/{customerID:[0-9]+}/accounts", accountHandler.NewAccount).Methods(http.MethodPost)
+	app.Get("/accounts/:customer_id/accounts", accountHandlerFiber.GetAccounts)
+	app.Post("/accounts/:customer_id/accounts", accountHandlerFiber.NewAccount)
+
+	app.Get("/customers", customerHandler.GetCustomers)
+	app.Get("/customers/:customer_id", customerHandler.GetCustomer)
 
 	logs.Info("Banking service started at port " + viper.GetString("app.port"))
-	http.ListenAndServe(fmt.Sprintf(":%v", viper.GetInt("app.port")), router)
+	// http.ListenAndServe(fmt.Sprintf(":%v", viper.GetInt("app.port")), router)
+	app.Listen(":8000")
 }
 
 func initDatabase() *sqlx.DB {
