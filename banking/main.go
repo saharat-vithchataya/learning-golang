@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	jwtware "github.com/gofiber/jwt/v3"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/spf13/viper"
@@ -26,6 +27,10 @@ func main() {
 	accountService := services.NewAccountService(accountRepository)
 	accountHandlerFiber := handler.NewAccountHandlerFiber(accountService)
 
+	userRepository := repository.NewUserRepository(db)
+	userService := services.NewUserService(userRepository)
+	userHandler := handler.NewUserHandlerFiber(userService)
+
 	// router := mux.NewRouter()
 	app := fiber.New()
 
@@ -34,6 +39,29 @@ func main() {
 
 	app.Get("/customers", customerHandler.GetCustomers)
 	app.Get("/customers/:customer_id", customerHandler.GetCustomer)
+
+	app.Post("/signup", userHandler.SignUp)
+	app.Post("/login", userHandler.Login)
+
+	app.Use("/whoami", jwtware.New(
+		jwtware.Config{
+			SigningMethod: "HS256",
+			SigningKey:    services.JwtSecret,
+			SuccessHandler: func(c *fiber.Ctx) error {
+				return c.Next()
+			},
+			ErrorHandler: func(c *fiber.Ctx, err error) error {
+				return fiber.ErrUnauthorized
+			},
+		},
+	))
+	app.Get("/whoami", userHandler.WhoAmI)
+	// app.Post("/login", func(c *fiber.Ctx) error {
+	// 	return nil
+	// })
+	// app.Get("/hello", func(c *fiber.Ctx) error {
+	// 	return nil
+	// })
 
 	logs.Info("Banking service started at port " + viper.GetString("app.port"))
 	// http.ListenAndServe(fmt.Sprintf(":%v", viper.GetInt("app.port")), router)
